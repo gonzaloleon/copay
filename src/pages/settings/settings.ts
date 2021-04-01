@@ -247,17 +247,19 @@ export class SettingsPage {
     if (this.bitPayIdUserInfo) {
       this.navCtrl.push(BitPayIdPage, this.bitPayIdUserInfo);
     } else {
-      this.iabCardProvider.loadingWrapper(() => {
-        this.logger.log('settings - pairing');
-        this.iabCardProvider.show();
-        setTimeout(() => {
-          this.iabCardProvider.sendMessage(
-            {
-              message: 'pairingOnly'
-            },
-            () => {}
-          );
-        }, 100);
+      this.iabCardProvider.initializeInstance(false).then( () => {
+        this.iabCardProvider.loadingWrapper(() => {
+          this.logger.log('settings - pairing');
+          this.iabCardProvider.show();
+          setTimeout(() => {
+            this.iabCardProvider.sendMessage(
+              {
+                message: 'pairingOnly'
+              },
+              () => {}
+            );
+          }, 100);
+        });
       });
     }
   }

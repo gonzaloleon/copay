@@ -52,7 +52,6 @@ import {
 import { AdvertisingComponent } from '../components/advertising/advertising';
 
 // Pages
-import { CARD_IAB_CONFIG } from '../constants';
 import { AddWalletPage } from '../pages/add-wallet/add-wallet';
 import { CopayersPage } from '../pages/add/copayers/copayers';
 import { ImportWalletPage } from '../pages/add/import-wallet/import-wallet';
@@ -363,64 +362,32 @@ export class CopayApp {
         this.popupProvider.ionicAlert('Error loading keys', err.message || '');
         this.logger.error('Error loading keys: ', err);
       });
-
+    
     let [token, cards]: any = await Promise.all([
       this.persistenceProvider.getBitPayIdPairingToken(Network[this.NETWORK]),
       this.persistenceProvider.getBitpayDebitCards(Network[this.NETWORK])
     ]);
-
-    await this.persistenceProvider.setTempMdesCertOnlyFlag('disabled');
-
-    if (
-      this.platformProvider.isCordova &&
-      this.appProvider.info.name === 'bitpay'
-    ) {
-      const host =
-        this.NETWORK === 'testnet' ? 'test.bitpay.com' : 'bitpay.com';
-      this.logger.log(`IAB host -> ${host}`);
-      // preloading the view
-
-      setTimeout(async () => {
-        // if (cards && this.platform.is('ios')) {
-        //   try {
-        //     cards = await this.iabCardProvider.checkAppleWallet(cards);
-        //   } catch (err) {
-        //     this.logger.error('apple wallet checkPairedDevices error', err);
-        //   }
-        // }
-
-        const agent = await this.userAgent.get();
-        this.logger.debug('BitPay: create IAB Instance');
-        try {
-          this.cardIAB_Ref = await this.iab.createIABInstance(
-            'card',
-            `${CARD_IAB_CONFIG},OverrideUserAgent=${agent}`,
-            `https://${host}/wallet-card?context=bpa`,
-            `( async () => {
-              const sendMessageToWallet = (message) => webkit.messageHandlers.cordova_iab.postMessage(JSON.stringify(message));
-              try {
-                window.postMessage({message: 'isDarkModeEnabled', payload: {theme: ${this.themeProvider.isDarkModeEnabled()}}},'*');
-                window.postMessage({message: 'getAppVersion', payload: ${JSON.stringify(
-                  this.appProvider.info.version
-                )}},'*');
-                await new Promise((res) => setTimeout(res, 300));
-                sessionStorage.setItem('isPaired', ${!!token}); 
-                sessionStorage.setItem('cards', ${JSON.stringify(
-                  JSON.stringify(cards)
-                )});
-                sendMessageToWallet({message: 'IABLoaded'});
-              } catch(err) {
-                sendMessageToWallet({message: 'IABError', log: err});
-              }   
-              })()`
-          );
-          this.iabCardProvider.init();
-        } catch (err) {
-          this.logger.debug('Error creating IAB instance: ', err.message);
-        }
-      });
-    }
+    const agent = await this.userAgent.get();
+    this.iabCardProvider.setInitialInstanceData(token, cards, agent);
+    setTimeout(async () => {
+      await this.iabCardProvider.initializeInstance(true);  
+    });   
   }
+
+  // public async initializeIAB(){
+    
+  //   if (
+  //     this.platformProvider.isCordova &&
+  //     this.appProvider.info.name === 'bitpay'
+  //   ) {
+  //     const host =
+  //       this.NETWORK === 'testnet' ? 'test.bitpay.com' : 'bitpay.com';
+  //     this.logger.log(`IAB host -> ${host}`);
+  //     // preloading the view
+
+      
+  //   }
+  // }
 
   private updateDesktopOnFocus() {
     const { remote } = (window as any).require('electron');

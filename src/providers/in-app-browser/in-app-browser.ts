@@ -46,6 +46,9 @@ export class InAppBrowserProvider {
     initScript?: string
   ): Promise<InAppBrowserRef> {
     return new Promise((res, rej) => {
+      if(this.refs[refName]){
+        this.refs[refName] = null;
+      }
       const ref: InAppBrowserRef = cordova.InAppBrowser.open(
         url,
         '_blank',
@@ -69,6 +72,9 @@ export class InAppBrowserProvider {
         }
       };
       ref.addEventListener('loadstop', initCb);
+      ref.addEventListener('exit', () => {
+        console.log('>>>> exit');
+      });
       ref.addEventListener('loaderror', err => {
         this.logger.debug(
           `InAppBrowserProvider -> ${refName} ${JSON.stringify(err)} load error`

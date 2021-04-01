@@ -25,6 +25,8 @@ import { OnGoingProcessProvider } from '../on-going-process/on-going-process';
 import { Network, PersistenceProvider } from '../persistence/persistence';
 import { ThemeProvider } from '../theme/theme';
 
+import { CARD_IAB_CONFIG } from '../../constants';
+
 const LOADING_WRAPPER_TIMEOUT = 0;
 const IAB_LOADING_INTERVAL = 1000;
 const IAB_LOADING_ATTEMPTS = 20;
@@ -37,6 +39,7 @@ export class IABCardProvider {
   private BITPAY_API_URL: string;
   public hasCards: boolean;
   private _isHidden = true;
+  private _isClosed = false;
   private _pausedState = false;
 
   public user = new BehaviorSubject({});
@@ -325,6 +328,66 @@ export class IABCardProvider {
           break;
       }
     });
+  }
+  private token:any;
+  private cards:any;
+  private agent:any;
+  
+  public setInitialInstanceData(token:any, card:any, agent: any){
+    this.token = token;
+    this.cards = card;
+    this.agent = agent;
+  }
+  
+  public async initializeInstance(firstTime: boolean = false){
+    return new Promise<void>( async (resolve, reject) => {
+        // if (cards && this.platform.is('ios')) {
+        //   try {
+        //     cards = await this.iabCardProvider.checkAppleWallet(cards);
+        //   } catch (err) {
+        //     this.logger.error('apple wallet checkPairedDevices error', err);
+        //   }
+        // }
+
+        // const agent = await this.userAgent.get();
+        this.logger.debug('BitPay: create IAB Instance');
+        if(!this._isClosed && !firstTime){
+          console.log('Not closed');
+          resolve();
+        }else{
+        try {
+          console.log('Create new Instance');
+          const host = this.NETWORK === 'testnet' ? 'test.bitpay.com' : 'bitpay.com';
+          this.cardIAB_Ref = await this.iab.createIABInstance(
+            'card',
+            `${CARD_IAB_CONFIG},OverrideUserAgent=${this.agent}`,
+            `https://${host}/wallet-card?context=bpa`,
+            `( async () => {
+              const sendMessageToWallet = (message) => webkit.messageHandlers.cordova_iab.postMessage(JSON.stringify(message));
+              try {
+                window.postMessage({message: 'isDarkModeEnabled', payload: {theme: ${this.themeProvider.isDarkModeEnabled()}}},'*');
+                window.postMessage({message: 'getAppVersion', payload: ${JSON.stringify(
+                  this.appProvider.info.version
+                )}},'*');
+                await new Promise((res) => setTimeout(res, 300));
+                sessionStorage.setItem('isPaired', ${!!this.token}); 
+                sessionStorage.setItem('cards', ${JSON.stringify(
+                  JSON.stringify(this.cards)
+                )});
+                sendMessageToWallet({message: 'IABLoaded'});
+              } catch(err) {
+                sendMessageToWallet({message: 'IABError', log: err});
+              }   
+              })()`
+          );
+          this.init();
+          return resolve();
+        } catch (err) {
+          this.logger.debug('Error creating IAB instance: ', err.message);
+          return reject();
+        }
+        }
+      });
   }
 
   async checkAppleWallet(cards) {
@@ -1000,27 +1063,58 @@ export class IABCardProvider {
   hide(): void {
     if (this.cardIAB_Ref) {
       this.sendMessage({ message: 'iabHiding' });
-      this.cardIAB_Ref.hide();
+      this.cardIAB_Ref.close();
+      this.cardIAB_Ref.events$.unsubscribe();
+      // this.cardIAB_Ref.hide();
+      this._isClosed = true;
       this._isHidden = true;
     }
   }
 
   show(disableLoadingScreen?: boolean): void {
+    console.log('>>> show closed: ' + this._isClosed);
     if (this.cardIAB_Ref) {
       let message = 'iabOpening';
 
       if (disableLoadingScreen) {
         message = `${message}?enableLoadingScreen`;
       }
-
       this.setTheme();
       this.sendMessage({ message });
       this.cardIAB_Ref.show();
+      this._isClosed=false;
+      // if(this._isClosed){
+      //   this.initializeInstance().then( () => {
+      //     this.loadingWrapper( () => {
+      //       console.log('Initialized Instance after close');
+      //       this.setTheme();
+      //       console.log('Initialized Instance after close: setTheme');
+      //       this.sendMessage({ message });
+      //       console.log('Initialized Instance after close: sendMessage '+ message);
+      //       this._isClosed=false;
+      //       try{
+      //       this.cardIAB_Ref.show();
+      //       if(this.cardIAB_Ref.error ) {
+      //         console.log('cardIAB_Ref.error cardIAB_Ref.show ' + this.cardIAB_Ref);
+      //       }
+      //       }catch(err){
+      //         console.log('error cardIAB_Ref.show ' + err);
+      //       }
+      //     });
+      //   });
+      // }else {
+      //   this.setTheme();
+      //   this.sendMessage({ message });
+      //   this.cardIAB_Ref.show();
+      // }
       this._isHidden = false;
     }
   }
 
   loadingWrapper(cb) {
+    if(this._isClosed){
+      cb();
+    }
     // wrapping in a setTimeout to smooth out initial iab animation
     const wrappedCb = () => setTimeout(cb, LOADING_WRAPPER_TIMEOUT);
 
@@ -1063,8 +1157,9 @@ export class IABCardProvider {
   }
 
   resume(): void {
-    if (this._pausedState) {
+    if (this._pausedState && !this._isClosed) {
       if (this.cardIAB_Ref) {
+        console.log('resuming');
         this.cardIAB_Ref.show();
         this._isHidden = false;
       }
