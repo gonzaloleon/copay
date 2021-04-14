@@ -74,6 +74,8 @@ export class SettingsPage {
   public config;
   public selectedAlternative;
   public isCordova: boolean;
+  public isWindows: boolean;
+  public isMac: boolean;
   public isCopay: boolean;
   public lockMethod: string;
   public integrationServices = [];
@@ -125,6 +127,8 @@ export class SettingsPage {
     this.appName = this.app.info.nameCase;
     this.appVersion = this.app.info.version;
     this.isCordova = this.platformProvider.isCordova;
+    this.isWindows = this.platformProvider.isWindows;
+    this.isMac = this.platformProvider.isMac;
     this.isCopay = this.app.info.name === 'copay';
     this.user$ = this.iabCardProvider.user$;
 
@@ -247,18 +251,78 @@ export class SettingsPage {
     if (this.bitPayIdUserInfo) {
       this.navCtrl.push(BitPayIdPage, this.bitPayIdUserInfo);
     } else {
-      this.iabCardProvider.loadingWrapper(() => {
-        this.logger.log('settings - pairing');
-        this.iabCardProvider.show();
-        setTimeout(() => {
-          this.iabCardProvider.sendMessage(
-            {
-              message: 'pairingOnly'
-            },
-            () => {}
+      if (this.isWindows || this.isMac) {
+        const host =
+          this.network === 'testnet' ? 'test.bitpay.com' : 'bitpay.com';
+        const { BrowserWindow } = (window as any).require('electron').remote; // BrowserView,
+        const win = new BrowserWindow({
+          show: false,
+          useContentSize: true,
+          maxWidth: 400,
+          maxHeight: 600,
+          darkTheme: this.themeProvider.isDarkModeEnabled(),
+          webPreferences: {
+            allowRunningInsecureContent: true,
+            enablePreferredSizeMode: true,
+            webviewTag: true
+          }
+        });
+
+        win.loadURL(`https://${host}/wallet-card?context=bpa`);
+        win.once('ready-to-show', () => {
+          win.show();
+        });
+        win.onbeforeunload = e => {
+          console.log('I do not want to be closed');
+
+          // Unlike usual browsers that a message box will be prompted to users, returning
+          // a non-void value will silently cancel the close.
+          // It is recommended to use the dialog API to let the user confirm closing the
+          // application.
+          e.returnValue = true; // equivalent to `return false` but not recommended
+        };
+        win.webContents.on('dom-ready', () => {
+          console.log('>>> dom-ready > execute script');
+          win.webContents.executeJavaScript(
+            `window.postMessage({message:"pairingOnly"},'*')`
           );
-        }, 100);
-      });
+          win.webContents.executeJavaScript(
+            `window.postMessage({message:"getAppVersion", payload: ${JSON.stringify(
+              this.app.info.version
+            )}},'*')`
+          );
+        });
+
+        win.webContents.on(
+          'console-message',
+          (_event, level, message, _line, _sourceId) => {
+            const log_level_names = {
+              '-1': 'DEBUG',
+              '0': 'INFO',
+              '1': 'WARN',
+              '2': 'ERROR'
+            };
+            console.log(
+              `${new Date().toUTCString()}\t${
+                log_level_names[level]
+              }\t${message} (${_sourceId}:${_line})`
+            );
+          }
+        );
+      } else {
+        this.iabCardProvider.loadingWrapper(() => {
+          this.logger.log('settings - pairing');
+          this.iabCardProvider.show();
+          setTimeout(() => {
+            this.iabCardProvider.sendMessage(
+              {
+                message: 'pairingOnly'
+              },
+              () => {}
+            );
+          }, 100);
+        });
+      }
     }
   }
 
