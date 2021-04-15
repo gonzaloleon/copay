@@ -56,7 +56,7 @@ function createWindow() {
   }
   // Emitted when the window is closed.
   win.on('closed', () => {
-    if (!win2) win2.close();
+    if (win2!==null) win2.close();
     // Dereference the window object, usually you would store windows
     // in an array if your app supports multi windows, this is the time
     // when you should delete the corresponding element.
@@ -112,10 +112,17 @@ function createBitpayIDWindow(data) {
     minHeight: 650,
     // darkTheme: data.darkMode,
     webPreferences: {
+      nodeIntegration: false,
+      webviewTag: true,
+      enableRemoteModule: true,
+      contextIsolation: false,
+      webSecurity: false,
+      allowRunningInsecureContent: true,
       preload: preloadScript
     }
   });
   // win2.setBrowserView(view);
+  // url = 'file://'+ __dirname + '/assets/scripts/electron-wv.html'
   win2.loadURL(url);
   win2.once('ready-to-show', () => {
     win2.show();
