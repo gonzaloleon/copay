@@ -254,61 +254,80 @@ export class SettingsPage {
       if (this.isWindows || this.isMac) {
         const host =
           this.network === 'testnet' ? 'test.bitpay.com' : 'bitpay.com';
-        const { BrowserWindow } = (window as any).require('electron').remote; // BrowserView,
-        const win = new BrowserWindow({
-          show: false,
-          useContentSize: true,
-          maxWidth: 400,
-          maxHeight: 600,
-          darkTheme: this.themeProvider.isDarkModeEnabled(),
-          webPreferences: {
-            allowRunningInsecureContent: true,
-            enablePreferredSizeMode: true,
-            webviewTag: true
-          }
+        const { ipcRenderer } = (window as any).require('electron');
+        ipcRenderer.send('open-bitpayId-login', {
+          host,
+          darkMode: this.themeProvider.isDarkModeEnabled()
         });
 
-        win.loadURL(`https://${host}/wallet-card?context=bpa`);
-        win.once('ready-to-show', () => {
-          win.show();
-        });
-        win.onbeforeunload = e => {
-          console.log('I do not want to be closed');
+        //   // const path = require('path');
+        // const preloadScript = `assets/scripts/preloader.js`;
+        // const url = `https://${host}/wallet-card?context=bpa`;
+        // const { BrowserWindow, BrowserView } = (window as any).require('electron').remote; // BrowserView,
+        // const view = new BrowserView({
+        //   webPreferences: {
+        //     contextIsolation: true,
+        //     preload: preloadScript
+        //   }
+        // });
+        // const win = new BrowserWindow({
+        //   show: false,
+        //   useContentSize: true,
+        //   maxWidth: 400,
+        //   maxHeight: 600,
+        //   darkTheme: this.themeProvider.isDarkModeEnabled(),
+        //   // webPreferences: {
+        //   //   odeIntegration: false, contextIsolation: true,
+        //   //   preload: preloadScript
+        //   // }
+        // });
+        // win.setBrowserView(view);
+        // win.loadURL(url);
+        // win.once('ready-to-show', () => {
+        //   win.show();
+        //   win.focus();
+        // });
+        // win.onbeforeunload = e => {
+        //   console.log('I do not want to be closed');
 
-          // Unlike usual browsers that a message box will be prompted to users, returning
-          // a non-void value will silently cancel the close.
-          // It is recommended to use the dialog API to let the user confirm closing the
-          // application.
-          e.returnValue = true; // equivalent to `return false` but not recommended
-        };
-        win.webContents.on('dom-ready', () => {
-          console.log('>>> dom-ready > execute script');
-          win.webContents.executeJavaScript(
-            `window.postMessage({message:"pairingOnly"},'*')`
-          );
-          win.webContents.executeJavaScript(
-            `window.postMessage({message:"getAppVersion", payload: ${JSON.stringify(
-              this.app.info.version
-            )}},'*')`
-          );
-        });
+        //   // Unlike usual browsers that a message box will be prompted to users, returning
+        //   // a non-void value will silently cancel the close.
+        //   // It is recommended to use the dialog API to let the user confirm closing the
+        //   // application.
+        //   e.returnValue = true; // equivalent to `return false` but not recommended
+        // };
+        // win.webContents.on('dom-ready', () => {
+        //   console.log('>>> dom-ready > execute script');
+        //   win.webContents.executeJavaScript(
+        //     `window.postMessage({message:"pairingOnly"},'*')`
+        //   );
+        //   win.webContents.executeJavaScript(
+        //     `window.postMessage({message:"getAppVersion", payload: ${JSON.stringify(
+        //       this.app.info.version
+        //     )}},'*')`
+        //   );
+        // });
 
-        win.webContents.on(
-          'console-message',
-          (_event, level, message, _line, _sourceId) => {
-            const log_level_names = {
-              '-1': 'DEBUG',
-              '0': 'INFO',
-              '1': 'WARN',
-              '2': 'ERROR'
-            };
-            console.log(
-              `${new Date().toUTCString()}\t${
-                log_level_names[level]
-              }\t${message} (${_sourceId}:${_line})`
-            );
-          }
-        );
+        // win.webContents.on(
+        //   'console-message',
+        //   (_event, level, message, _line, _sourceId) => {
+        //     const log_level_names = {
+        //       '-1': 'DEBUG',
+        //       '0': 'INFO',
+        //       '1': 'WARN',
+        //       '2': 'ERROR'
+        //     };
+        //     console.log(
+        //       `${log_level_names[level]
+        //       }\t${message} (${_sourceId}:${_line})`
+        //     );
+        //   }
+        // );
+        // win.webContents.openDevTools();
+
+        // // ipcMain.on('postMessage', () => {
+        // //   console.log('We received a postMessage from the preload script')
+        // // })
       } else {
         this.iabCardProvider.loadingWrapper(() => {
           this.logger.log('settings - pairing');

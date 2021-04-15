@@ -1,4 +1,11 @@
-const { app, Menu, BrowserWindow, Notification, ipcMain } = require('electron');
+const {
+  app,
+  Menu,
+  BrowserView,
+  BrowserWindow,
+  Notification,
+  ipcMain
+} = require('electron');
 const path = require('path');
 const url = require('url');
 const os = require('os');
@@ -49,6 +56,7 @@ function createWindow() {
   }
   // Emitted when the window is closed.
   win.on('closed', () => {
+    if (!win2) win2.close();
     // Dereference the window object, usually you would store windows
     // in an array if your app supports multi windows, this is the time
     // when you should delete the corresponding element.
@@ -73,8 +81,50 @@ function createWindow() {
     }
   });
 
+  ipcMain.on('open-bitpayId-login', (event, data) => {
+    createBitpayIDWindow(data);
+  });
+
   win.once('ready-to-show', () => {
     win.show();
+  });
+}
+
+let win2;
+function createBitpayIDWindow(data) {
+  const host = data.host;
+  console.log('creatingBitpayIDWindow with host ' + host);
+  // const path = require('path');
+  const preloadScript = `assets/scripts/preloader.js`;
+  const url = `https://${host}/wallet-card?context=bpa`;
+  // const view = new BrowserView({
+  //   webPreferences: {
+  //     contextIsolation: true,
+  //     preload: preloadScript
+  //   }
+  // });
+  win2 = new BrowserWindow({
+    show: false,
+    width: 400,
+    height: 650,
+    minWidth: 400,
+    maxWidth: 800,
+    minHeight: 650,
+    // darkTheme: data.darkMode,
+    webPreferences: {
+      preload: preloadScript
+    }
+  });
+  // win2.setBrowserView(view);
+  win2.loadURL(url);
+  win2.once('ready-to-show', () => {
+    win2.show();
+    win2.focus();
+    win2.webContents.send('fromWallet', 'Send a message via postMessage');
+  });
+  win2.webContents.openDevTools();
+  ipcMain.on('sendToWallet', (event, args) => {
+    console.log('We received a postMessage from the preload script');
   });
 }
 
