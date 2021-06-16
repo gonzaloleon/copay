@@ -50,6 +50,15 @@ export class AddressbookPage {
     this.isEmptyList = _.isEmpty(this.addressbook);
   }
 
+  public removeNewAddressBook() {
+    this.addressbookProvider.removeAddressBook().then(() => {
+      alert('AddressBook removed');
+      this.addressbookProvider
+        .migrateOldContacts()
+        .then(() => this.initAddressbook());
+    });
+  }
+
   public addEntry(): void {
     this.navCtrl.push(AddressbookAddPage);
   }
